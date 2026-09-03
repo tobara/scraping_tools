@@ -1,0 +1,48 @@
+name: Build Pogger Pepe Web Mosaic Pack
+
+on:
+  push:
+    branches:
+      - pogger-mosaic-build-20260903
+    paths:
+      - .github/workflows/build_pogger_mosaic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out isolated build branch
+        uses: actions/checkout@v4
+
+      - name: Reconstruct and verify builder
+        shell: bash
+        run: |
+          cat pogger_builder_parts/part_*.b64 | base64 --decode | gzip --decompress > build_pogger_mosaic.py
+          echo "2e74e9d85c2298cdb690838e30357e00b0f4561595b8ee5fdf20a154d8b9e3db  build_pogger_mosaic.py" | sha256sum --check --strict
+          python -m py_compile build_pogger_mosaic.py
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install rendering dependencies
+        run: python -m pip install --upgrade pillow numpy scipy
+
+      - name: Collect 625 images and render pack
+        run: python build_pogger_mosaic.py --output-dir dist --target-count 625
+
+      - name: Upload verified ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: pogger-pepe-web-mosaic-pack
+          path: dist/pogger_pepe_web_mosaic_pack.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
